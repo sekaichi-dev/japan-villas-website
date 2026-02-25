@@ -4,13 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guest Guidebook | Mountain Villa Niseko</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/guidebook.css">
-    <script src="js/translations.js?v=4"></script>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Guest Guidebook | Japan Villas</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/guidebook.css">
+    <script src="../js/translations.js?v=4"></script>
     <!-- Supabase Auth -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/auth.js?v=3"></script>
+    <script src="../js/auth.js?v=3"></script>
     <script>
         function toggleMobileMenu() {
             const dropdown = document.getElementById('mobileMenuDropdown');
@@ -35,10 +36,10 @@
     <!-- Global Header -->
     <header class="guidebook-header">
         <div class="header-inner">
-            <a href="index.html" class="nav-logo">
+            <span class="nav-logo brand">
                 <span class="logo-desktop">JAPAN VILLAS.</span>
                 <span class="logo-mobile">JV.</span>
-            </a>
+            </span>
             <div class="header-search">
                 <input type="text" id="guidebook-search" class="search-input" placeholder="Search guidebook..."
                     autocomplete="off">
@@ -86,14 +87,15 @@
     <!-- Top Horizontal Navigation -->
     <div id="top-nav-container" class="top-nav-container"></div>
 
+
     <!-- Hero Section -->
     <section class="guidebook-hero">
         <div class="hero-image-container">
-            <img data-img="hero.jpg" alt="Property Hero" class="hero-image">
+            <img data-img="main.jpg" alt="Property Hero" class="hero-image" style="object-position: center 15%;">
             <div class="hero-overlay"></div>
         </div>
         <div class="hero-content">
-            <h1 class="property-name" id="property-name">Mountain Villa ニセコ / Mountain Villa Niseko</h1>
+            <h1 class="property-name" id="property-name">LAKE HOUSE Nojiriko</h1>
             <p class="welcome-message" id="welcome-message">Welcome! Here's everything you need for your stay.</p>
         </div>
     </section>
@@ -107,7 +109,7 @@
                 <span class="sidebar-subtitle" data-i18n="guidebook.sidebar.subtitle">Guest Guidebook</span>
             </div>
             <nav class="sidebar-nav">
-                <a href="#greeting" class="sidebar-item" onclick="switchCategory('greeting'); return false;">
+                <a href="#greeting" class="sidebar-item">
                     <span class="sidebar-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -118,7 +120,7 @@
                     </span>
                     <span class="sidebar-text" data-i18n="guidebook.nav.greeting">Welcome</span>
                 </a>
-                <a href="#access" class="sidebar-item active" onclick="switchCategory('access'); return false;">
+                <a href="#access" class="sidebar-item active">
                     <span class="sidebar-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -128,7 +130,7 @@
                     </span>
                     <span class="sidebar-text" data-i18n="guidebook.nav.access">Access</span>
                 </a>
-                <a href="#facility" class="sidebar-item" onclick="switchCategory('facility'); return false;">
+                <a href="#facility" class="sidebar-item">
                     <span class="sidebar-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -138,7 +140,7 @@
                     </span>
                     <span class="sidebar-text" data-i18n="guidebook.nav.facilities">Facilities</span>
                 </a>
-                <a href="#neighborhood" class="sidebar-item" onclick="switchCategory('neighborhood'); return false;">
+                <a href="#neighborhood" class="sidebar-item">
                     <span class="sidebar-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -149,7 +151,7 @@
                     </span>
                     <span class="sidebar-text" data-i18n="guidebook.nav.neighborhood">Neighborhood</span>
                 </a>
-                <a href="#rules" class="sidebar-item" onclick="switchCategory('rules'); return false;">
+                <a href="#rules" class="sidebar-item">
                     <span class="sidebar-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -162,7 +164,7 @@
                     </span>
                     <span class="sidebar-text" data-i18n="guidebook.nav.rules">House Rules</span>
                 </a>
-                <a href="#faq" class="sidebar-item" onclick="switchCategory('faq'); return false;">
+                <a href="#faq" class="sidebar-item">
                     <span class="sidebar-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -172,6 +174,17 @@
                         </svg>
                     </span>
                     <span class="sidebar-text" data-i18n="guidebook.nav.faq">FAQ</span>
+                </a>
+                <a href="#services" class="sidebar-item">
+                    <span class="sidebar-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon
+                                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                            </polygon>
+                        </svg>
+                    </span>
+                    <span class="sidebar-text" data-i18n="guidebook.nav.services">Services</span>
                 </a>
             </nav>
         </aside>
@@ -185,6 +198,15 @@
         <main class="guidebook-content">
             <!-- Sections will be generated by JS -->
             <div id="sections-container"></div>
+
+            <!-- Optional Services / Upsell Section -->
+            <section class="guidebook-section services-section" id="services">
+                <h2 class="section-title" data-i18n="guidebook.services.title">Optional Services</h2>
+                <p class="section-subtitle" data-i18n="guidebook.services.subtitle">Enhance your stay</p>
+                <div class="services-grid" id="services-grid">
+                    <!-- Generated by JS -->
+                </div>
+            </section>
             <!-- Footer (Moved inside main content) -->
             <footer class="guidebook-footer"
                 style="margin-top: 4rem; background: transparent; border: none; padding-left: 0; padding-right: 0;">
@@ -197,8 +219,13 @@
         </main>
     </div>
 
-    <script src="js/guidebook-mv-niseko.js?v=3"></script>
-    <script src="js/lang-dropdown.js?v=3"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        window.stripe = Stripe("pk_test_51R4JWIGDBBKX0pDfQEoMMaYOZFdivdN0lWJoBPRrW6pRH1gW1GLXMQqsjdsEnEDUgrebF5ophMmm5WgwsujOhyBM00gxs18K9H");
+    </script>
+
+    <script src="../js/guidebook-lakeside-inn.js?v=3"></script>
+    <script src="../js/lang-dropdown.js?v=3"></script>
 </body>
 
 </html>

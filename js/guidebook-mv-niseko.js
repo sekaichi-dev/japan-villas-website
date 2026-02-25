@@ -1,4 +1,4 @@
-const IMG_BASE = 'img/mv_niseko/';
+const IMG_BASE = '/img/mv_niseko/';
 const PROPERTY_KEY = 'mv_niseko';
 
 function resolveImagePaths() {

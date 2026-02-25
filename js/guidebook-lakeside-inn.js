@@ -1,4 +1,4 @@
-const IMG_BASE = 'img/lakeside_inn/';
+const IMG_BASE = '/img/lakeside_inn/';
 const PROPERTY_KEY = 'lakeside_inn';
 
 function resolveImagePaths() {

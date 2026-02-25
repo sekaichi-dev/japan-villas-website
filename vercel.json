@@ -1,0 +1,19 @@
+{
+    "redirects": [
+        {
+            "source": "/guidebook-lake-house.html",
+            "destination": "/404",
+            "statusCode": 404
+        },
+        {
+            "source": "/guidebook-lakeside-inn.html",
+            "destination": "/404",
+            "statusCode": 404
+        },
+        {
+            "source": "/guidebook-mv-niseko.html",
+            "destination": "/404",
+            "statusCode": 404
+        }
+    ]
+}
