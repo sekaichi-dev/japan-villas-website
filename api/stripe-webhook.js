@@ -60,8 +60,7 @@ export default async function handler(req, res) {
 
     // Check Supabase configuration
     if (!isSupabaseConfigured()) {
-        console.error('[stripe-webhook] Missing Supabase configuration');
-        return res.status(500).json({ error: 'Database configuration error' });
+        console.warn('[stripe-webhook] ⚠️ Missing Supabase configuration - proceeding without DB inserts for testing');
     }
 
     const stripe = new Stripe(stripeSecretKey);
@@ -150,39 +149,41 @@ async function handleCheckoutSessionCompleted(session) {
         return;
     }
 
-    const supabase = getSupabaseClient();
+    if (isSupabaseConfigured()) {
+        const supabase = getSupabaseClient();
 
-    // Check for existing reservation (idempotency)
-    const { data: existing, error: lookupError } = await supabase
-        .from('reservations')
-        .select('id, status')
-        .eq('stripe_session_id', session.id)
-        .single();
+        // Check for existing reservation (idempotency)
+        const { data: existing, error: lookupError } = await supabase
+            .from('reservations')
+            .select('id, status')
+            .eq('stripe_session_id', session.id)
+            .single();
 
-    if (lookupError && lookupError.code !== 'PGRST116') {
-        // PGRST116 = no rows found, which is expected for new sessions
-        console.error('[stripe-webhook] Error checking for existing reservation:', lookupError);
-        throw lookupError;
-    }
-
-    if (existing) {
-        console.log('[stripe-webhook] ℹ️ Reservation already exists for session:', session.id);
-        console.log('[stripe-webhook] Existing reservation ID:', existing.id, 'Status:', existing.status);
-
-        // If already exists but not marked as paid, update it
-        if (existing.status === 'pending') {
-            const { error: updateError } = await supabase
-                .from('reservations')
-                .update({ status: 'paid' })
-                .eq('id', existing.id);
-
-            if (updateError) {
-                console.error('[stripe-webhook] Error updating reservation status:', updateError);
-                throw updateError;
-            }
-            console.log('[stripe-webhook] ✅ Updated existing reservation to paid');
+        if (lookupError && lookupError.code !== 'PGRST116') {
+            // PGRST116 = no rows found, which is expected for new sessions
+            console.error('[stripe-webhook] Error checking for existing reservation:', lookupError);
+            throw lookupError;
         }
-        return;
+
+        if (existing) {
+            console.log('[stripe-webhook] ℹ️ Reservation already exists for session:', session.id);
+            console.log('[stripe-webhook] Existing reservation ID:', existing.id, 'Status:', existing.status);
+
+            // If already exists but not marked as paid, update it
+            if (existing.status === 'pending') {
+                const { error: updateError } = await supabase
+                    .from('reservations')
+                    .update({ status: 'paid' })
+                    .eq('id', existing.id);
+
+                if (updateError) {
+                    console.error('[stripe-webhook] Error updating reservation status:', updateError);
+                    throw updateError;
+                }
+                console.log('[stripe-webhook] ✅ Updated existing reservation to paid');
+            }
+            return;
+        }
     }
 
     // Parse metadata if present (contains booking details from frontend)
@@ -210,24 +211,31 @@ async function handleCheckoutSessionCompleted(session) {
     };
 
     // Insert new reservation
-    const { data: newReservation, error: insertError } = await supabase
-        .from('reservations')
-        .insert(reservationData)
-        .select()
-        .single();
+    let newReservationId = null;
+    if (isSupabaseConfigured()) {
+        const supabase = getSupabaseClient();
+        const { data: newReservation, error: insertError } = await supabase
+            .from('reservations')
+            .insert(reservationData)
+            .select()
+            .single();
 
-    if (insertError) {
-        // Check if it's a duplicate key error (race condition)
-        if (insertError.code === '23505') {
-            console.log('[stripe-webhook] ℹ️ Duplicate insert detected (race condition), reservation already exists');
-            return;
+        if (insertError) {
+            // Check if it's a duplicate key error (race condition)
+            if (insertError.code === '23505') {
+                console.log('[stripe-webhook] ℹ️ Duplicate insert detected (race condition), reservation already exists');
+                return;
+            }
+            console.error('[stripe-webhook] Error inserting reservation:', insertError);
+            throw insertError;
         }
-        console.error('[stripe-webhook] Error inserting reservation:', insertError);
-        throw insertError;
-    }
 
-    console.log('[stripe-webhook] ✅ Reservation created successfully');
-    console.log('[stripe-webhook] Reservation ID:', newReservation.id);
+        newReservationId = newReservation.id;
+        console.log('[stripe-webhook] ✅ Reservation created successfully');
+        console.log('[stripe-webhook] Reservation ID:', newReservationId);
+    } else {
+        console.log('[stripe-webhook] ⚠️ Supabase not configured: skipping reservation DB insert.');
+    }
 
     // --- PHASE 2: Create booking in Beds24 ---
     if (metadata.room_id) {
@@ -245,12 +253,16 @@ async function handleCheckoutSessionCompleted(session) {
             });
 
             if (beds24BookingId) {
-                // Update reservation with Beds24 ID
-                await supabase
-                    .from('reservations')
-                    .update({ beds24_booking_id: beds24BookingId })
-                    .eq('id', newReservation.id);
                 console.log('[stripe-webhook] ✅ Beds24 booking created:', beds24BookingId);
+
+                // Update reservation with Beds24 ID
+                if (isSupabaseConfigured() && newReservationId) {
+                    const supabase = getSupabaseClient();
+                    await supabase
+                        .from('reservations')
+                        .update({ beds24_booking_id: beds24BookingId })
+                        .eq('id', newReservationId);
+                }
             }
         } catch (err) {
             console.error('[stripe-webhook] ❌ Failed to create Beds24 booking:', err.message);
@@ -313,18 +325,20 @@ async function createBeds24Booking(bookingInfo) {
 async function handleCheckoutSessionExpired(session) {
     console.log('[stripe-webhook] Checkout session expired:', session.id);
 
-    const supabase = getSupabaseClient();
+    if (isSupabaseConfigured()) {
+        const supabase = getSupabaseClient();
 
-    // Update reservation status if it exists
-    const { error } = await supabase
-        .from('reservations')
-        .update({ status: 'cancelled' })
-        .eq('stripe_session_id', session.id)
-        .eq('status', 'pending');
+        // Update reservation status if it exists
+        const { error } = await supabase
+            .from('reservations')
+            .update({ status: 'cancelled' })
+            .eq('stripe_session_id', session.id)
+            .eq('status', 'pending');
 
-    if (error) {
-        console.error('[stripe-webhook] Error updating expired session:', error);
-        // Don't throw - session expiry is not critical
+        if (error) {
+            console.error('[stripe-webhook] Error updating expired session:', error);
+            // Don't throw - session expiry is not critical
+        }
     }
 }
 
