@@ -1,4 +1,5 @@
 // Vercel Serverless Function: /api/beds24/properties.js
+import { getBeds24Token } from './auth.js';
 
 // Simple in-memory cache for warm container reuse
 let cachedProperties = null;
@@ -16,11 +17,7 @@ export default async function handler(req, res) {
     }
 
     // 2. Fetch from Beds24
-    const token = process.env.BEDS24_TOKEN;
-    if (!token) {
-        console.error("Missing BEDS24_TOKEN environment variable");
-        return res.status(500).json({ error: "Server Configuration Error" });
-    }
+    const token = await getBeds24Token();
 
     try {
         const response = await fetch("https://api.beds24.com/v2/properties?include=content", {
@@ -41,13 +38,13 @@ export default async function handler(req, res) {
         const normalizedProperties = apiProperties.map(p => {
             const content = p.content || {};
             const rawImages = content.pictures || content.images || [];
-            const images = Array.isArray(rawImages) ? 
+            const images = Array.isArray(rawImages) ?
                 rawImages.map(img => img.url || img.src || img) : [];
 
             if (images.length === 0) images.push("images/placeholder.jpg");
 
             const rawAmenities = content.amenities || [];
-            const features = Array.isArray(rawAmenities) ? 
+            const features = Array.isArray(rawAmenities) ?
                 rawAmenities.map(a => typeof a === 'object' ? (a.name || a.text) : a) : ["Luxury Stay"];
 
             return {
@@ -56,7 +53,7 @@ export default async function handler(req, res) {
                 location: (p.city && p.country) ? `${p.city}, ${p.country}` : (p.address || "Japan"),
                 lat: parseFloat(p.latitude) || 0,
                 lng: parseFloat(p.longitude) || 0,
-                price: 55000, 
+                price: 55000,
                 images: images,
                 details: {
                     bedrooms: parseInt(p.numBedrooms || content.bedrooms || 2),

@@ -1,4 +1,5 @@
 // Vercel Serverless Function: /api/beds24/price.js
+import { getBeds24Token } from './auth.js';
 
 export default async function handler(req, res) {
     try {
@@ -7,11 +8,7 @@ export default async function handler(req, res) {
             return res.status(405).json({ error: "Method not allowed" });
         }
 
-        const token = (process.env.BEDS24_TOKEN || "").trim();
-        if (!token) {
-            console.error("[beds24-price] Missing or empty BEDS24_TOKEN");
-            return res.status(500).json({ error: "Missing BEDS24_TOKEN env var" });
-        }
+        const token = await getBeds24Token();
 
         const { roomId, arrival, departure, numAdults = 2 } = req.query;
 

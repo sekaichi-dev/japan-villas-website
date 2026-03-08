@@ -1,11 +1,13 @@
 // Vercel Serverless Function: /api/beds24/availability.js
 // 
 // Beds24 API v2 Authentication:
-// This API requires a custom HTTP header "token" (NOT Authorization header).
+// Uses BEDS24_REFRESH_TOKEN to obtain a short-lived access token automatically.
 //
 // Caching Strategy:
 // - In-memory cache with 90-second TTL
 // - HTTP Cache-Control headers for CDN/browser caching
+
+import { getBeds24Token } from './auth.js';
 
 const cache = new Map();
 const CACHE_TTL_MS = 90 * 1000; // 90 seconds
@@ -53,12 +55,7 @@ export default async function handler(req, res) {
             return res.status(200).json(cached.data);
         }
 
-        const rawToken = process.env.BEDS24_TOKEN;
-        if (!rawToken) {
-            return res.status(500).json({ error: "Missing BEDS24_TOKEN env var" });
-        }
-
-        const token = rawToken.trim();
+        const token = await getBeds24Token();
         const baseUrl = "https://beds24.com/api/v2/inventory/rooms/availability";
         let queryParts = [];
         for (const [k, v] of Object.entries(req.query || {})) {

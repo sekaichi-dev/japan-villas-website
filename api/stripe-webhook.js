@@ -16,6 +16,7 @@
 
 import Stripe from 'stripe';
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase.js';
+import { getBeds24Token } from './beds24/auth.js';
 
 export const config = {
     api: {
@@ -266,10 +267,10 @@ async function handleCheckoutSessionCompleted(session) {
 
 /**
  * Helper to create a booking in Beds24 v2 API
+ * Uses getBeds24Token() to automatically refresh the access token when needed.
  */
 async function createBeds24Booking(bookingInfo) {
-    const token = process.env.BEDS24_TOKEN;
-    if (!token) throw new Error('Missing BEDS24_TOKEN');
+    const token = await getBeds24Token();
 
     const response = await fetch('https://api.beds24.com/v2/bookings', {
         method: 'POST',
