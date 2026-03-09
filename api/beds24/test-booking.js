@@ -29,7 +29,7 @@ export default async function handler(req, res) {
                 firstName: bookingInfo.firstName,
                 lastName: bookingInfo.lastName,
                 email: bookingInfo.email,
-                status: 'new', // Using 'new' instead of 'confirmed' just in case
+                status: 'confirmed', // Using 'new' instead of 'confirmed' just in case
                 notes: bookingInfo.notes
             }])
         });
