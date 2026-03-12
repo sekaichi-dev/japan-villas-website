@@ -491,6 +491,11 @@
             const urlParams = new URLSearchParams(window.location.search);
             const paymentStatus = urlParams.get('payment');
             const sessionId = urlParams.get('session_id');
+            // Retrieve booking data early to show the UI
+            const bookingDataForUI = JSON.parse(sessionStorage.getItem('bookingData'));
+            if (bookingDataForUI) {
+                populateCheckoutUI(bookingDataForUI);
+            }
 
             // Handle payment success - VERIFY against database before showing confirmation
             if (paymentStatus === 'success' && sessionId) {
@@ -539,9 +544,6 @@
                 if (data.verified && data.reservation) {
                     // Payment is genuinely confirmed - show success UI
                     showVerifiedSuccessUI(data.reservation);
-                    // Clear booking data
-                    sessionStorage.removeItem('bookingData');
-
                     // Try to link reservation to logged-in user (if any)
                     if (typeof SupabaseAuth !== 'undefined') {
                         const user = await SupabaseAuth.getCurrentUser();
@@ -590,35 +592,40 @@
                                 <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                         </div>
-                        <h1 class="checkout-title" style="color: #4CAF50; margin-bottom: 1rem;">Booking Confirmed!</h1>
+                        <h1 class="checkout-title" style="color: #4CAF50; margin-bottom: 1rem;" data-i18n="checkout.bookingConfirmed">Booking Confirmed!</h1>
                         <p style="color: #aaa; margin-bottom: 2rem; font-size: 1.1rem;">
-                            Thank you for your reservation. A confirmation email will be sent to<br>
-                            <strong style="color: #fff;">${reservation.customerEmail || 'your email address'}</strong>
+                            <span data-i18n="checkout.thankYouEmail">Thank you for your reservation. A confirmation email will be sent to</span><br>
+                            <strong style="color: #fff;">${reservation.customerEmail || ''}</strong>
                         </p>
                         
                         <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 1.5rem; text-align: left; max-width: 400px; margin: 0 auto 2rem;">
-                            <h3 style="margin-bottom: 1rem; font-size: 1rem; color: #888;">Reservation Details</h3>
+                            <h3 style="margin-bottom: 1rem; font-size: 1rem; color: #888;" data-i18n="checkout.reservationDetails">Reservation Details</h3>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                                <span style="color: #888;">Confirmation ID</span>
+                                <span style="color: #888;" data-i18n="checkout.confirmationId">Confirmation ID</span>
                                 <span style="color: #fff; font-family: monospace;">${reservation.id.slice(0, 8).toUpperCase()}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                                <span style="color: #888;">Amount Paid</span>
+                                <span style="color: #888;" data-i18n="checkout.amountPaid">Amount Paid</span>
                                 <span style="color: #fff; font-weight: 600;">¥${reservation.amount.toLocaleString()}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
-                                <span style="color: #888;">Status</span>
-                                <span style="color: #4CAF50; font-weight: 500;">${reservation.status.toUpperCase()}</span>
+                                <span style="color: #888;" data-i18n="checkout.status">Status</span>
+                                <span style="color: #4CAF50; font-weight: 500;" data-i18n="checkout.statusPaid">${reservation.status.toUpperCase()}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #888;">Date</span>
+                                <span style="color: #888;" data-i18n="checkout.date">Date</span>
                                 <span style="color: #fff;">${new Date(reservation.createdAt).toLocaleDateString()}</span>
                             </div>
                         </div>
                         
-                        <a href="/" class="next-btn" style="display: inline-block; text-decoration: none;">Return to Home</a>
+                        <a href="/" class="next-btn" style="display: inline-block; text-decoration: none;" data-i18n="checkout.returnToHome">Return to Home</a>
                     </div>
-                `;
+                \`;
+
+                // Re-apply translations after injecting new HTML
+                if (typeof window.applyTranslations === 'function') {
+                    window.applyTranslations();
+                }
             }
         }
 
