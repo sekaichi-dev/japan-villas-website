@@ -60,8 +60,9 @@ export default async function handler(req, res) {
                         product_data: {
                             name: productName,
                         },
-                        // TEST MODE: Hardcode 100 JPY for testing
-                        unit_amount: 100,
+                        // For JPY, amount is already in the smallest unit (no cents)
+                        // For other currencies like USD, Stripe expects cents
+                        unit_amount: currency.toLowerCase() === 'jpy' ? Math.round(amount) : Math.round(amount * 100),
                     },
                     quantity: 1,
                 },
