@@ -2081,26 +2081,6 @@ If the staff is absent, please return the key to the key box and leave us a mess
                     jp: "使用方法は「各部屋と備品のご案内」タブ内のBBQセクションに記載しておりますので、そちらをご確認ください。"
                 }
             }
-        },
-        {
-            id: "test-payment",
-            name: { en: "Test Payment (¥100)", jp: "テスト予約（100円）" },
-            price: 100,
-            description: {
-                en: "This is a test item for system verification.",
-                jp: "システム確認用のテスト項目です。実際に100円の決済が発生します。"
-            },
-            image: "placeholder.jpg",
-            icon: "check",
-            modalDetails: {
-                title: { en: "Test Payment", jp: "テスト予約" },
-                overview: {
-                    en: "Verification of real payment and Beds24 integration.",
-                    jp: "本番決済とBeds24連携の確認用です。"
-                },
-                priceLabel: { en: "Price", jp: "料金" },
-                priceValue: "¥100"
-            }
         }
     ]
 };

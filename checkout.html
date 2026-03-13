@@ -646,12 +646,21 @@
             document.getElementById('summary-guests').textContent = `${bookingData.adults} Guest${bookingData.adults > 1 ? 's' : ''}`;
 
             const breakdownContainer = document.getElementById('breakdown-lines');
-            if (bookingData.prices) {
-                const { perNight, nights, total } = bookingData.prices;
+            if (bookingData && bookingData.prices) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const isTest = urlParams.get('test') === '100';
+
+                let { perNight, nights, total } = bookingData.prices;
+                
+                if (isTest) {
+                    total = 100;
+                    perNight = 100 / nights; // Mock per night price for display
+                }
+
                 breakdownContainer.innerHTML = `
-                    <div class="price-row">
-                        <span>¥${perNight.toLocaleString()} x ${nights} nights</span>
-                        <span>¥${(perNight * nights).toLocaleString()}</span>
+                    <div class="price-row" ${isTest ? 'style="color: #ff6b6b; font-weight: bold;"' : ''}>
+                        <span>${isTest ? '[TEST MODE] ' : ''}¥${perNight.toLocaleString()} x ${nights} nights</span>
+                        <span>¥${(isTest ? 100 : (perNight * nights)).toLocaleString()}</span>
                     </div>
                     <div class="price-row">
                         <span>Taxes & fees</span>
@@ -701,9 +710,14 @@
 
             try {
                 const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                
+                // Allow 100 JPY test if URL param 'test=100' is present
+                const urlParams = new URLSearchParams(window.location.search);
+                const isTest = urlParams.get('test') === '100';
+                
                 const paymentData = {
-                    productName: `${bookingData.name} - ${bookingData.dateRangeString}`,
-                    amount: bookingData.prices.total,
+                    productName: (isTest ? '[TEST] ' : '') + `${bookingData.name} - ${bookingData.dateRangeString}`,
+                    amount: isTest ? 100 : bookingData.prices.total,
                     currency: 'jpy',
                     metadata: {
                         property_id: bookingData.propertyId,
@@ -711,7 +725,8 @@
                         check_in_date: bookingData.dates.start,
                         check_out_date: bookingData.dates.end,
                         guests: bookingData.adults,
-                        room_id: bookingData.roomId || '' // Added roomId if available
+                        room_id: bookingData.roomId || '',
+                        is_test: isTest ? 'true' : 'false'
                     }
                 };
 
