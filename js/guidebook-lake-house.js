@@ -2594,20 +2594,31 @@ async function handleServiceClick(serviceId) {
     const service = guidebookData.services.find(s => s.id === serviceId);
     if (!service) return;
 
-    // ジャグジー（¥10,000）だけStripeに接続
-    if (service.price === 10000) {
+    // priceが設定されていればStripeで決済可能にする
+    if (service.price && service.price > 0) {
         try {
+            const currentUrl = window.location.href;
+            const successUrl = `${window.location.origin}/g/option-success.html?return_url=${encodeURIComponent(window.location.pathname)}`;
+
+            // URLパラメータ ?booking= からBeds24のbookingIDを取得（メッセージ送信に使用）
+            const urlParams = new URLSearchParams(window.location.search);
+            const beds24BookingId = urlParams.get('booking') || '';
+            
             const res = await fetch("/api/create-checkout-session", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    productName: "Lake House Jacuzzi",
-                    amount: 10000,
+                    productName: `${guidebookData.propertyName} - ${service.name.en || service.name}`,
+                    amount: service.price,
                     currency: "jpy",
                     metadata: {
-                        property: "lake-house",
-                        option: "jacuzzi"
-                    }
+                        property: guidebookData.propertyId,
+                        option: service.id.toString(),
+                        option_name: service.name.en || service.name,
+                        beds24_booking_id: beds24BookingId // Beds24メッセージ送信に使用
+                    },
+                    successUrl: successUrl,
+                    cancelUrl: currentUrl
                 })
             });
 
@@ -2617,15 +2628,15 @@ async function handleServiceClick(serviceId) {
                 // guidebook-lake-house.html で定義した stripe を使用
                 stripe.redirectToCheckout({ sessionId: data.sessionId });
             } else {
-                alert("決済開始に失敗しました");
+                alert(window.currentLang === 'jp' ? "決済開始に失敗しました" : "Failed to start checkout");
             }
         } catch (error) {
             console.error("Stripe error:", error);
-            alert("エラーが発生しました。もう一度お試しください。");
+            alert(window.currentLang === 'jp' ? "エラーが発生しました。もう一度お試しください。" : "An error occurred. Please try again.");
         }
 
     } else {
-        alert("このオプションはまだオンライン決済未対応です。");
+        alert(window.currentLang === 'jp' ? "このオプションはまだオンライン決済未対応です。" : "This option is not available for online payment yet.");
     }
 }
 

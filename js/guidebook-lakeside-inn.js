@@ -2045,6 +2045,7 @@ If the staff is absent, please return the key to the key box and leave us a mess
             id: "bbq",
             name: { en: "BBQ", jp: "BBQ" },
             price: 4000,
+            inventoryLimit: 2, // 2台しかないため在庫チェックを行う
             description: {
                 en: "Enjoy BBQ on the deck.\n*Please note that only 2 grills are available in total.",
                 jp: "デッキでのBBQをお楽しみいただけます。\n※BBQグリルは全体で2台のみのご用意となりますので、あらかじめご了承ください。"
@@ -2499,32 +2500,71 @@ function renderSections() {
     container.innerHTML = html;
 }
 
-function renderServices() {
+async function renderServices() {
     const grid = document.getElementById('services-grid');
     if (!grid) return;
 
     const lang = getLang();
     const getT = (k) => window.getI18n ? window.getI18n(k, lang) : (window.translations?.[lang]?.[k] ?? '');
     const reserveText = getT('guidebook.services.reserve') || 'Reserve';
+    const soldOutText = lang === 'jp' ? 'この期間は満員' : 'Sold Out';
+
+    // Fetch inventory availability for options that have limits
+    // We check all services upfront in parallel to keep UI fast
+    const guestBooking = window.currentGuestBooking || {};
+    const inventoryMap = {};
+
+    await Promise.all(guidebookData.services.map(async (service) => {
+        // Only check if the option has a known inventory limit (BBQ = 2)
+        if (service.inventoryLimit && guestBooking.arrival && guestBooking.departure) {
+            try {
+                const params = new URLSearchParams({
+                    option: service.id.toString(),
+                    property: guidebookData.propertyId || 'lake-side-inn',
+                    arrival: guestBooking.arrival,
+                    departure: guestBooking.departure,
+                });
+                const res = await fetch(`/api/check-option-inventory?${params}`);
+                const data = await res.json();
+                inventoryMap[service.id] = data; // { available, remaining, max }
+            } catch (e) {
+                // Fail open – show as available if check fails
+                inventoryMap[service.id] = { available: true };
+            }
+        }
+    }));
 
     const html = guidebookData.services.map(service => {
         const serviceName = getLocalizedText(service.name);
         const serviceDesc = getLocalizedText(service.description);
+        const inv = inventoryMap[service.id];
+        const isSoldOut = inv && !inv.available;
+
+        const badge = isSoldOut
+            ? `<span style="display:inline-block; background:#555; color:#fff; font-size:0.7em; padding:2px 8px; border-radius:99px; margin-left:6px;">${soldOutText}</span>`
+            : (inv && inv.remaining !== null ? `<span style="display:inline-block; background:#c0392b22; color:#c0392b; font-size:0.7em; padding:2px 8px; border-radius:99px; margin-left:6px;">${lang === 'jp' ? `残り${inv.remaining}個` : `${inv.remaining} left`}</span>` : '');
+
+        const btn = isSoldOut
+            ? `<button class="service-btn" disabled style="opacity:0.4; cursor:not-allowed;">${soldOutText}</button>`
+            : `<button class="service-btn" onclick="event.stopPropagation(); handleServiceClick('${service.id}')">${reserveText}</button>`;
+
         return `
-                                                                                        <div class="service-card" style="cursor: pointer;" onclick="openServiceModal('${service.id}')">
-                                                                                            <img data-img="${service.image}" alt="${serviceName}" class="service-image" loading="lazy">
-                                                                                                <div class="service-info">
-                                                                                                    <h3 class="service-name">${serviceName}</h3>
-                                                                                                    <p class="service-desc">${serviceDesc}</p>
-                                                                                                    <p class="service-price">¥${service.price.toLocaleString()}</p>
-                                                                                                    <button class="service-btn" onclick="event.stopPropagation(); handleServiceClick('${service.id}')">${reserveText}</button>
-                                                                                                </div>
-                                                                                        </div>
-                                                                                        `;
+            <div class="service-card" style="cursor: pointer; ${isSoldOut ? 'opacity:0.7;' : ''}" onclick="openServiceModal('${service.id}')">
+                <img data-img="${service.image}" alt="${serviceName}" class="service-image" loading="lazy">
+                <div class="service-info">
+                    <h3 class="service-name">${serviceName}${badge}</h3>
+                    <p class="service-desc">${serviceDesc}</p>
+                    <p class="service-price">¥${service.price.toLocaleString()}</p>
+                    ${btn}
+                </div>
+            </div>`;
     }).join('');
 
     grid.innerHTML = html;
+    // Re-resolve image paths after rendering
+    if (typeof resolveImagePaths === 'function') resolveImagePaths();
 }
+
 
 // ============================================
 // ACCORDION FUNCTIONALITY
@@ -2806,21 +2846,31 @@ async function handleServiceClick(serviceId) {
     const service = guidebookData.services.find(s => s.id === serviceId);
     if (!service) return;
 
-    // BBQ (¥4,000) only: Connect to Stripe
-    if (service.id === "bbq") {
+    // priceが設定されていればStripeで決済可能にする
+    if (service.price && service.price > 0) {
         try {
+            const currentUrl = window.location.href;
+            const successUrl = `${window.location.origin}/g/option-success.html?return_url=${encodeURIComponent(window.location.pathname)}`;
+
+            // URLパラメータ ?booking= からBeds24のbookingIDを取得（メッセージ送信に使用）
+            const urlParams = new URLSearchParams(window.location.search);
+            const beds24BookingId = urlParams.get('booking') || '';
+            
             const res = await fetch("/api/create-checkout-session", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    productName: `Lake Side Inn - ${getLocalizedText(service.name)}`,
-                    amount: 4000,
+                    productName: `${guidebookData.propertyName || 'Lake Side Inn'} - ${service.name.en || service.name}`,
+                    amount: service.price,
                     currency: "jpy",
                     metadata: {
-                        property: "lake-side-inn",
-                        option: "bbq",
-                        optionId: String(service.id)
-                    }
+                        property: guidebookData.propertyId || "lake-side-inn",
+                        option: service.id.toString(),
+                        option_name: service.name.en || service.name,
+                        beds24_booking_id: beds24BookingId // Beds24メッセージ送信に使用
+                    },
+                    successUrl: successUrl,
+                    cancelUrl: currentUrl
                 })
             });
 
@@ -2830,15 +2880,15 @@ async function handleServiceClick(serviceId) {
                 // Use the stripe instance defined in guidebook-lakeside-inn.html
                 window.stripe.redirectToCheckout({ sessionId: data.sessionId });
             } else {
-                alert("決済開始に失敗しました");
+                alert(window.currentLang === 'jp' ? "決済開始に失敗しました" : "Failed to start checkout");
             }
         } catch (error) {
             console.error("Stripe error:", error);
-            alert("エラーが発生しました。もう一度お試しください。");
+            alert(window.currentLang === 'jp' ? "エラーが発生しました。もう一度お試しください。" : "An error occurred. Please try again.");
         }
 
     } else {
-        alert("このオプションはまだオンライン決済未対応です。");
+        alert(window.currentLang === 'jp' ? "このオプションはまだオンライン決済未対応です。" : "This option is not available for online payment yet.");
     }
 }
 

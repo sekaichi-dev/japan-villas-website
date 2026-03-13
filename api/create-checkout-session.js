@@ -67,8 +67,8 @@ export default async function handler(req, res) {
                     quantity: 1,
                 },
             ],
-            success_url: `${origin}/checkout.html?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${origin}/checkout.html?payment=cancelled`,
+            success_url: req.body.successUrl || `${origin}/checkout.html?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: req.body.cancelUrl || `${origin}/checkout.html?payment=cancelled`,
         });
 
         // Return only the session ID to the frontend

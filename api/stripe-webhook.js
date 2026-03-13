@@ -194,6 +194,31 @@ async function handleCheckoutSessionCompleted(session) {
         console.warn('[stripe-webhook] Could not parse session metadata');
     }
 
+    // For option-only purchases, resolve the guest's stay dates from Beds24
+    // so the inventory check query can detect date overlaps correctly.
+    let resolvedArrival = metadata.check_in_date || null;
+    let resolvedDeparture = metadata.check_out_date || null;
+
+    if (metadata.option && metadata.beds24_booking_id && (!resolvedArrival || !resolvedDeparture)) {
+        try {
+            const beds24BookingRes = await fetch(
+                `https://api.beds24.com/v2/bookings?id=${encodeURIComponent(metadata.beds24_booking_id)}`,
+                { headers: { 'token': await getBeds24Token() } }
+            );
+            if (beds24BookingRes.ok) {
+                const b24Data = await beds24BookingRes.json();
+                const b24Booking = Array.isArray(b24Data) ? b24Data[0] : b24Data?.data?.[0];
+                if (b24Booking) {
+                    resolvedArrival = b24Booking.arrival || resolvedArrival;
+                    resolvedDeparture = b24Booking.departure || resolvedDeparture;
+                    console.log(`[stripe-webhook] Resolved stay dates from Beds24: ${resolvedArrival} → ${resolvedDeparture}`);
+                }
+            }
+        } catch (err) {
+            console.warn('[stripe-webhook] Could not resolve stay dates from Beds24:', err.message);
+        }
+    }
+
     // Prepare reservation data
     const reservationData = {
         stripe_session_id: session.id,
@@ -203,9 +228,9 @@ async function handleCheckoutSessionCompleted(session) {
         status: 'paid',
         customer_email: session.customer_details?.email || null,
         customer_name: session.customer_details?.name || null,
-        property_name: metadata.property_name || null,
-        check_in_date: metadata.check_in_date || null,
-        check_out_date: metadata.check_out_date || null,
+        property_name: metadata.property_name || metadata.property || null,
+        check_in_date: resolvedArrival,
+        check_out_date: resolvedDeparture,
         guests: metadata.guests ? parseInt(metadata.guests) : null,
         metadata: metadata,
     };
@@ -269,8 +294,8 @@ async function handleCheckoutSessionCompleted(session) {
         console.warn('[stripe-webhook] ⚠️ No room_id in metadata, skipping Beds24 booking');
     }
 
-    // TODO: Send confirmation email to customer
-    // TODO: Notify admin of new booking
+    // Send confirmation emails to customer and admin
+    await sendConfirmationEmail(session, metadata);
 }
 
 /**
@@ -349,3 +374,129 @@ async function handlePaymentFailed(paymentIntent) {
     // TODO: Notify customer of failed payment
     // TODO: Release reserved inventory
 }
+
+/**
+ * Helper to send payment notifications via Beds24 messages + host email.
+ *
+ * - Beds24 message: sent to guest (OTA channel) and as internal note (host)
+ * - Host email: sent to ryosuke@sekaichi.org and stay@sekaichi.org via Resend
+ *   (free plan: 3,000 emails/month, 100/day – more than enough for host notifications)
+ *
+ * Required env vars:
+ *   RESEND_API_KEY  – API key from resend.com (free plan OK)
+ *   BEDS24_REFRESH_TOKEN – already configured
+ */
+async function sendConfirmationEmail(session, metadata) {
+    const customerName = session.customer_details?.name || 'Customer';
+    const customerEmail = session.customer_details?.email || '';
+    const amount = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: session.currency }).format(session.amount_total);
+    const isOption = !!metadata.option;
+    const propertyName = metadata.property_name || metadata.property || 'Japan Villas';
+
+    // The beds24 booking id – present for stay bookings, may be absent for option-only purchases
+    const beds24BookingId = metadata.beds24_booking_id
+        ? parseInt(metadata.beds24_booking_id)
+        : null;
+
+    // Build message / email body texts
+    let guestMessage = '';
+    let internalNote = '';
+    let hostEmailSubject = '';
+    let hostEmailHtml = '';
+
+    if (isOption) {
+        const optionName = metadata.option_name || 'オプション';
+        guestMessage = `【Japan Villas】オプション購入のご確認\n\n${customerName} 様\n\nJapan Villas をご利用いただきありがとうございます。以下のオプション購入が完了いたしました。\n\n施設: ${propertyName}\nオプション: ${optionName}\n金額: ${amount}\n\nご滞在をお楽しみくださいませ。`;
+        internalNote = `[Stripe決済完了] オプション購入\nお客様名: ${customerName}\nメール: ${customerEmail}\n施設: ${propertyName}\nオプション: ${optionName}\n金額: ${amount}\nStripe Session: ${session.id}`;
+        hostEmailSubject = `【決済通知】オプション購入がありました – ${propertyName} / ${optionName}`;
+        hostEmailHtml = `
+            <h2 style="color:#333;">【Japan Villas】オプション購入の決済が完了しました</h2>
+            <table style="border-collapse:collapse; width:100%; max-width:500px; font-size:15px; color:#333;">
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">お客様名</td><td style="padding:8px; border-bottom:1px solid #eee;">${customerName}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">メールアドレス</td><td style="padding:8px; border-bottom:1px solid #eee;">${customerEmail || '未取得'}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">施設</td><td style="padding:8px; border-bottom:1px solid #eee;">${propertyName}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">オプション</td><td style="padding:8px; border-bottom:1px solid #eee;">${optionName}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">金額</td><td style="padding:8px; border-bottom:1px solid #eee; font-size:18px; color:#c0392b;"><strong>${amount}</strong></td></tr>
+                <tr><td style="padding:8px; font-weight:bold;">Stripe Session</td><td style="padding:8px; font-size:12px; color:#888;">${session.id}</td></tr>
+            </table>`;
+    } else {
+        guestMessage = `【Japan Villas】ご予約の決済が完了しました\n\n${customerName} 様\n\nJapan Villas をご利用いただきありがとうございます。以下のご宿泊予約の決済が完了いたしました。\n\n施設: ${propertyName}\nチェックイン: ${metadata.check_in_date || '未指定'}\nチェックアウト: ${metadata.check_out_date || '未指定'}\n金額: ${amount}\n\nご来館をお待ちしております。`;
+        internalNote = `[Stripe決済完了] 宿泊予約\nお客様名: ${customerName}\nメール: ${customerEmail}\n施設: ${propertyName}\nチェックイン: ${metadata.check_in_date || '未指定'}\nチェックアウト: ${metadata.check_out_date || '未指定'}\n金額: ${amount}\nStripe Session: ${session.id}`;
+        hostEmailSubject = `【決済通知】宿泊予約の決済がありました – ${propertyName}`;
+        hostEmailHtml = `
+            <h2 style="color:#333;">【Japan Villas】宿泊予約の決済が完了しました</h2>
+            <table style="border-collapse:collapse; width:100%; max-width:500px; font-size:15px; color:#333;">
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">お客様名</td><td style="padding:8px; border-bottom:1px solid #eee;">${customerName}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">メールアドレス</td><td style="padding:8px; border-bottom:1px solid #eee;">${customerEmail || '未取得'}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">施設</td><td style="padding:8px; border-bottom:1px solid #eee;">${propertyName}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">チェックイン</td><td style="padding:8px; border-bottom:1px solid #eee;">${metadata.check_in_date || '未指定'}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">チェックアウト</td><td style="padding:8px; border-bottom:1px solid #eee;">${metadata.check_out_date || '未指定'}</td></tr>
+                <tr><td style="padding:8px; border-bottom:1px solid #eee; font-weight:bold;">金額</td><td style="padding:8px; border-bottom:1px solid #eee; font-size:18px; color:#c0392b;"><strong>${amount}</strong></td></tr>
+                <tr><td style="padding:8px; font-weight:bold;">Stripe Session</td><td style="padding:8px; font-size:12px; color:#888;">${session.id}</td></tr>
+            </table>`;
+    }
+
+    // ── 1. Beds24 message (guest notification + internal note) ─────────────────
+    if (!beds24BookingId) {
+        console.warn('[stripe-webhook] ⚠️ No beds24_booking_id in metadata. Skipping Beds24 message.');
+        console.info('[stripe-webhook] 📋 Payment summary:\n' + internalNote);
+    } else {
+        try {
+            const token = await getBeds24Token();
+            const messages = [
+                { bookingId: beds24BookingId, message: guestMessage },
+                { bookingId: beds24BookingId, message: internalNote, source: 'internalNote' },
+            ];
+
+            const b24Res = await fetch('https://api.beds24.com/v2/bookings/messages', {
+                method: 'POST',
+                headers: { 'token': token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(messages),
+            });
+            const b24Result = await b24Res.json();
+
+            if (b24Result.success === false) {
+                console.error('[stripe-webhook] ❌ Beds24 message error:', JSON.stringify(b24Result));
+            } else {
+                console.log('[stripe-webhook] ✅ Beds24 messages sent.');
+            }
+        } catch (err) {
+            console.error('[stripe-webhook] ❌ Beds24 message failed:', err.message);
+        }
+    }
+
+    // ── 2. Host email notification via Resend ──────────────────────────────────
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+        console.warn('[stripe-webhook] ⚠️ RESEND_API_KEY not set. Skipping host email notification.');
+        return;
+    }
+
+    const hostRecipients = ['ryosuke@sekaichi.org', 'stay@sekaichi.org'];
+
+    try {
+        const emailRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                from: 'Japan Villas <noreply@sekaichi.org>',
+                to: hostRecipients,
+                subject: hostEmailSubject,
+                html: hostEmailHtml,
+            }),
+        });
+
+        const emailResult = await emailRes.json();
+        if (emailResult.id) {
+            console.log('[stripe-webhook] ✅ Host notification emails sent to:', hostRecipients.join(', '));
+        } else {
+            console.error('[stripe-webhook] ❌ Resend API error:', JSON.stringify(emailResult));
+        }
+    } catch (err) {
+        console.error('[stripe-webhook] ❌ Host email failed:', err.message);
+    }
+}
+

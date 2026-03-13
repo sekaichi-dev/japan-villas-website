@@ -130,6 +130,14 @@
             document.getElementById('guidebook-auth-style').remove();
         }
 
+        // Expose booking info so guidebook JS can use it (e.g. for inventory checks)
+        window.currentGuestBooking = {
+            bookingId: bookingId,
+            arrival: booking.arrival,
+            departure: booking.departure,
+            propertyId: String(booking.propertyId),
+        };
+
     } catch (err) {
         console.error("Guidebook Auth Error:", err);
         // Fail-safe: Block on error to prevent circumvention

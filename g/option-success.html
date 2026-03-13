@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option Purchase Complete | Japan Villas</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/guidebook.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: var(--font-body);
+        }
+        .success-container {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem;
+        }
+        .icon svg {
+            color: #4CAF50;
+        }
+        h1 {
+            font-family: var(--font-display);
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+        p {
+            color: #aaa;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        .btn {
+            display: inline-block;
+            background: #fff;
+            color: #000;
+            text-decoration: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #ddd;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </div>
+        <h1 id="title">Payment Successful</h1>
+        <p id="message">Thank you. Your option purchase has been completed.</p>
+        <a href="#" id="return-btn" class="btn">Return to Guidebook</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Apply language
+            const lang = localStorage.getItem('siteLang') || 'en';
+            if (lang === 'jp') {
+                document.getElementById('title').textContent = '決済が完了しました';
+                document.getElementById('message').textContent = 'オプションのご注文ありがとうございます。決済が正常に完了しました。';
+                document.getElementById('return-btn').textContent = 'ガイドブックに戻る';
+            }
+
+            // Get return URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const returnUrl = urlParams.get('return_url');
+            
+            const returnBtn = document.getElementById('return-btn');
+            if (returnUrl) {
+                returnBtn.href = decodeURIComponent(returnUrl);
+            } else {
+                returnBtn.href = '/'; // fallback
+            }
+        });
+    </script>
+</body>
+</html>
