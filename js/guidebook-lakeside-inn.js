@@ -2878,8 +2878,11 @@ async function handleServiceClick(serviceId) {
 
             const data = await res.json();
 
-            if (data.sessionId) {
-                // Use the stripe instance defined in guidebook-lakeside-inn.html
+            if (data.url) {
+                // Open in new tab as requested by user
+                window.open(data.url, '_blank');
+            } else if (data.sessionId) {
+                // Fallback for older Stripe.js version or missing URL
                 window.stripe.redirectToCheckout({ sessionId: data.sessionId });
             } else {
                 alert(window.currentLang === 'jp' ? "決済開始に失敗しました" : "Failed to start checkout");

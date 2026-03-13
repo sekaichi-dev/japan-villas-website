@@ -155,7 +155,10 @@ export default async function handler(req, res) {
             }
         }
 
-        return res.status(200).json({ sessionId: session.id });
+        return res.status(200).json({ 
+            sessionId: session.id,
+            url: session.url
+        });
 
     } catch (err) {
         console.error('[create-checkout-session] Error:', err.message);

@@ -2661,8 +2661,11 @@ async function handleServiceClick(serviceId) {
 
             const data = await res.json();
 
-            if (data.sessionId) {
-                // guidebook-lake-house.html で定義した stripe を使用
+            if (data.url) {
+                // Open in new tab as requested by user
+                window.open(data.url, '_blank');
+            } else if (data.sessionId) {
+                // Fallback
                 stripe.redirectToCheckout({ sessionId: data.sessionId });
             } else {
                 alert(window.currentLang === 'jp' ? "決済開始に失敗しました" : "Failed to start checkout");
